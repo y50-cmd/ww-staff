@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カメラ動作確認</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+    body { background: #f0f2f5; color: #1e293b; padding: 16px; }
+    main { max-width: 420px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 12px; }
+    h2 { font-size: 14px; margin: 16px 0 8px; }
+    button { width: 100%; padding: 16px; font-size: 16px; font-weight: 700; color: #fff; background: #1e293b; border: 0; border-radius: 10px; }
+    button:disabled { background: #94a3b8; }
+    video { display: none; width: 100%; margin-top: 12px; background: #000; border-radius: 10px; }
+    #status { margin-top: 12px; padding: 12px; font-size: 15px; font-weight: 600; background: #fff; border-radius: 10px; }
+    #status.ok { background: #dcfce7; color: #166534; }
+    #status.ng { background: #fee2e2; color: #991b1b; }
+    #result { margin-top: 8px; font-size: 13px; word-break: break-all; }
+    ul { list-style: none; background: #fff; border-radius: 10px; padding: 4px 12px; font-size: 13px; }
+    li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #f1f5f9; }
+    li:first-child { border-top: 0; }
+    li span:last-child { font-weight: 600; text-align: right; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>カメラ動作確認（スタッフ用テスト）</h1>
+  <button id="start" type="button">カメラを起動</button>
+  <video id="video" playsinline muted></video>
+  <div id="status">「カメラを起動」を押してください。</div>
+  <div id="result"></div>
+  <h2>診断結果</h2>
+  <ul id="checks"></ul>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+(function () {
+  var video = document.getElementById('video');
+  var startButton = document.getElementById('start');
+  var statusBox = document.getElementById('status');
+  var resultBox = document.getElementById('result');
+  var checks = document.getElementById('checks');
+  var canvas = document.createElement('canvas');
+  var context = canvas.getContext('2d', { willReadFrequently: true });
+  var stream = null;
+  var scanning = false;
+
+  function addCheck(label, value) {
+    var item = document.createElement('li');
+    var name = document.createElement('span');
+    var answer = document.createElement('span');
+    name.textContent = label;
+    answer.textContent = value;
+    item.appendChild(name);
+    item.appendChild(answer);
+    checks.appendChild(item);
+  }
+
+  function setStatus(message, className) {
+    statusBox.textContent = message;
+    statusBox.className = className || '';
+  }
+
+  function stopCamera() {
+    scanning = false;
+    if (stream) {
+      stream.getTracks().forEach(function (track) { track.stop(); });
+      stream = null;
+    }
+    video.style.display = 'none';
+    startButton.disabled = false;
+  }
+
+  function explainCameraError(error) {
+    if (error.name === 'NotAllowedError') {
+      return 'カメラが許可されていません（ブラウザの許可、またはGASの画面の制限）。';
+    }
+    if (error.name === 'NotFoundError') { return 'カメラが見つかりません。'; }
+    if (error.name === 'NotReadableError') { return 'カメラを他のアプリが使用中です。'; }
+    return 'カメラを起動できませんでした。';
+  }
+
+  function runDiagnostics() {
+    var policy = document.permissionsPolicy || document.featurePolicy;
+    addCheck('HTTPS接続', window.isSecureContext ? 'OK' : 'NG');
+    addCheck('カメラAPI', navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 'OK' : 'NG');
+    addCheck('画面内カメラ許可', policy && policy.allowsFeature ? (policy.allowsFeature('camera') ? 'OK' : 'NG') : '判定不可');
+    addCheck('QR解析ライブラリ', typeof window.jsQR === 'function' ? 'OK' : 'NG');
+  }
+
+  function scanFrame() {
+    if (!scanning) { return; }
+    if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+      var scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      var image = context.getImageData(0, 0, canvas.width, canvas.height);
+      var code = window.jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
+      if (code) {
+        setStatus('読み取り成功', 'ok');
+        resultBox.textContent = '読み取った内容: ' + code.data;
+        stopCamera();
+        return;
+      }
+    }
+    window.setTimeout(scanFrame, 200);
+  }
+
+  startButton.addEventListener('click', function () {
+    startButton.disabled = true;
+    resultBox.textContent = '';
+    setStatus('カメラを起動しています…');
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus('この画面ではカメラAPIを使えません。', 'ng');
+      startButton.disabled = false;
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      .then(function (cameraStream) {
+        stream = cameraStream;
+        video.srcObject = stream;
+        video.style.display = 'block';
+        return video.play();
+      })
+      .then(function () {
+        if (typeof window.jsQR !== 'function') {
+          setStatus('カメラは動きましたが、QR解析ライブラリを読み込めませんでした。', 'ng');
+          return;
+        }
+        setStatus('カメラ起動OK。会員証のQRを映してください。', 'ok');
+        scanning = true;
+        scanFrame();
+      })
+      .catch(function (error) {
+        setStatus(explainCameraError(error) + '（' + error.name + '）', 'ng');
+        stopCamera();
+      });
+  });
+
+  window.addEventListener('pagehide', stopCamera);
+  runDiagnostics();
+})();
+</script>
+</body>
+</html>
