@@ -43,6 +43,16 @@
     dd.expired { color: #991b1b; }
     .message { margin-top: 14px; padding: 10px 12px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 14px; white-space: pre-wrap; }
     .message strong { display: block; font-size: 12px; color: #92400e; margin-bottom: 2px; }
+    .panel { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
+    .panel-title { font-size: 13px; color: #64748b; margin-bottom: 8px; }
+    .hours { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .hours button { padding: 12px 0; font-size: 14px; font-weight: 700; color: #1e293b; background: #f1f5f9; border: 2px solid #f1f5f9; border-radius: 10px; }
+    .hours button[aria-pressed="true"] { background: #dbeafe; border-color: #2563eb; color: #1e3a8a; }
+    .start { background: #15803d; }
+    .in-use { padding: 12px; background: #e0f2fe; border-radius: 10px; color: #075985; font-size: 14px; line-height: 1.7; }
+    .in-use strong { font-size: 15px; }
+    .done { padding: 12px; background: #dcfce7; border-radius: 10px; color: #166534; font-size: 14px; line-height: 1.7; }
+    .done strong { font-size: 16px; }
   </style>
 </head>
 <body>
@@ -97,6 +107,33 @@
         <dt>月額有効期限</dt><dd id="monthlyExpiry"></dd>
       </dl>
       <div class="message hidden" id="memberMessage"><strong>伝言（スタッフ用）</strong><span id="memberMessageText"></span></div>
+
+      <!-- 利用中のとき -->
+      <div class="panel hidden" id="inUsePanel">
+        <div class="in-use" id="inUse"></div>
+      </div>
+
+      <!-- 利用開始 -->
+      <div class="panel hidden" id="startPanel">
+        <div id="hoursArea">
+          <div class="panel-title">予定利用時間</div>
+          <div class="hours" id="hours">
+            <button type="button" data-hours="1" aria-pressed="false">1時間</button>
+            <button type="button" data-hours="2" aria-pressed="false">2時間</button>
+            <button type="button" data-hours="3" aria-pressed="false">3時間</button>
+            <button type="button" data-hours="4" aria-pressed="false">4時間以上</button>
+          </div>
+        </div>
+        <div class="panel-title hidden" id="monthlyNote">月額会員のため、利用時間の入力は不要です。</div>
+        <button class="primary start" type="button" id="startButton">利用開始</button>
+        <div class="notice hidden" id="startNotice"></div>
+      </div>
+
+      <!-- 利用開始の完了 -->
+      <div class="panel hidden" id="donePanel">
+        <div class="done" id="done"></div>
+      </div>
+
       <button class="primary" type="button" id="nextButton">次の会員を読み取る</button>
     </section>
   </div>
@@ -281,9 +318,107 @@
     $('monthlyExpiry').className = member.monthlyExpired ? 'expired' : '';
     $('memberMessageText').textContent = member.message;
     show($('memberMessage'), Boolean(member.message));
+    renderStartPanel(member);
     show($('result'), true);
     $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // ---------------------------------------------------------------- 利用開始
+
+  var currentMember = null;
+  var selectedHours = null;
+  var starting = false;
+
+  function lines(element, items) {
+    element.textContent = '';
+    items.forEach(function (item, index) {
+      var line = document.createElement(index === 0 ? 'strong' : 'div');
+      line.textContent = item;
+      element.appendChild(line);
+      if (index === 0) { element.appendChild(document.createElement('br')); }
+    });
+  }
+
+  function usageLines(title, usage) {
+    var items = [title, '利用ID：' + usage.usageId, '開始：' + usage.startedAtText, '予定利用時間：' + usage.plannedDurationText];
+    if (usage.plannedEndText && usage.plannedEndText !== 'なし') { items.push('予定終了：' + usage.plannedEndText); }
+    return items;
+  }
+
+  function selectHours(hours) {
+    selectedHours = hours;
+    Array.prototype.forEach.call($('hours').querySelectorAll('button'), function (button) {
+      button.setAttribute('aria-pressed', String(Number(button.getAttribute('data-hours')) === hours));
+    });
+  }
+
+  function renderStartPanel(member) {
+    currentMember = member;
+    selectHours(null);
+    notify($('startNotice'), '');
+    show($('donePanel'), false);
+    var inUse = Boolean(member.activeUsage);
+    show($('inUsePanel'), inUse);
+    if (inUse) { lines($('inUse'), usageLines('この会員は利用中です', member.activeUsage)); }
+    show($('startPanel'), !inUse && member.state !== 'unavailable');
+    show($('hoursArea'), !member.monthlyActive);
+    show($('monthlyNote'), Boolean(member.monthlyActive));
+    $('startButton').disabled = false;
+  }
+
+  Array.prototype.forEach.call($('hours').querySelectorAll('button'), function (button) {
+    button.addEventListener('click', function () {
+      selectHours(Number(button.getAttribute('data-hours')));
+      notify($('startNotice'), '');
+    });
+  });
+
+  function sendStart(confirmed) {
+    if (!session || session.expiresAt <= Date.now()) {
+      backToLogin('ログインの有効期限が切れました。もう一度ログインしてください。');
+      return;
+    }
+    starting = true;
+    $('startButton').disabled = true;
+    notify($('startNotice'), '記録しています…', 'info');
+    callApi({
+      action: 'startUsage',
+      token: session.token,
+      memberNo: currentMember.memberNo,
+      plannedHours: currentMember.monthlyActive ? null : selectedHours,
+      confirmed: confirmed
+    }).then(function (result) {
+      starting = false;
+      if (result.error === 'unauthorized') {
+        backToLogin(result.message);
+        return;
+      }
+      if (result.error === 'needsConfirm') {
+        notify($('startNotice'), '');
+        $('startButton').disabled = false;
+        if (window.confirm(result.message)) { sendStart(true); }
+        return;
+      }
+      if (!result.ok) {
+        notify($('startNotice'), result.message);
+        $('startButton').disabled = result.error === 'alreadyActive' || result.error === 'notAllowed';
+        return;
+      }
+      show($('startPanel'), false);
+      lines($('done'), usageLines('利用開始を記録しました', result.usage));
+      show($('donePanel'), true);
+      $('donePanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
+  $('startButton').addEventListener('click', function () {
+    if (starting || !currentMember) { return; }
+    if (!currentMember.monthlyActive && !selectedHours) {
+      notify($('startNotice'), '予定利用時間を選んでください。');
+      return;
+    }
+    sendStart(false);
+  });
 
   $('searchForm').addEventListener('submit', function (event) {
     event.preventDefault();
