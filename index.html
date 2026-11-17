@@ -1,67 +1,302 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>カメラ動作確認</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>WONDER WALL 受付</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
-    body { background: #f0f2f5; color: #1e293b; padding: 16px; }
-    main { max-width: 420px; margin: 0 auto; }
-    h1 { font-size: 18px; margin-bottom: 12px; }
-    h2 { font-size: 14px; margin: 16px 0 8px; }
-    button { width: 100%; padding: 16px; font-size: 16px; font-weight: 700; color: #fff; background: #1e293b; border: 0; border-radius: 10px; }
-    button:disabled { background: #94a3b8; }
-    video { display: none; width: 100%; margin-top: 12px; background: #000; border-radius: 10px; }
-    #status { margin-top: 12px; padding: 12px; font-size: 15px; font-weight: 600; background: #fff; border-radius: 10px; }
-    #status.ok { background: #dcfce7; color: #166534; }
-    #status.ng { background: #fee2e2; color: #991b1b; }
-    #result { margin-top: 8px; font-size: 13px; word-break: break-all; }
-    ul { list-style: none; background: #fff; border-radius: 10px; padding: 4px 12px; font-size: 13px; }
-    li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #f1f5f9; }
-    li:first-child { border-top: 0; }
-    li span:last-child { font-weight: 600; text-align: right; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", Roboto, "Hiragino Sans", sans-serif; }
+    body { background: #f0f2f5; color: #1e293b; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; background: #0f172a; color: #f8fafc; }
+    header h1 { font-size: 16px; letter-spacing: 1px; }
+    header .who { font-size: 12px; color: #cbd5e1; text-align: right; }
+    header button { margin-top: 2px; padding: 4px 10px; font-size: 12px; color: #f8fafc; background: transparent; border: 1px solid #475569; border-radius: 6px; }
+    main { max-width: 440px; margin: 0 auto; padding: 16px; }
+    section { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    h2 { font-size: 15px; margin-bottom: 12px; }
+    label { display: block; font-size: 12px; color: #64748b; margin: 10px 0 4px; }
+    input { width: 100%; padding: 12px; font-size: 17px; border: 1px solid #cbd5e1; border-radius: 10px; }
+    .primary { width: 100%; padding: 15px; margin-top: 14px; font-size: 16px; font-weight: 700; color: #fff; background: #1e293b; border: 0; border-radius: 10px; }
+    .secondary { padding: 12px 16px; font-size: 15px; font-weight: 600; color: #1e293b; background: #e2e8f0; border: 0; border-radius: 10px; }
+    button:disabled { opacity: 0.5; }
+    .row { display: flex; gap: 8px; align-items: stretch; }
+    .row input { flex: 1; min-width: 0; }
+    .hidden { display: none !important; }
+    .notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+    .notice.error { background: #fee2e2; color: #991b1b; }
+    .notice.info { background: #e0f2fe; color: #075985; }
+    video { width: 100%; margin-top: 12px; border-radius: 10px; background: #000; }
+    .badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-size: 15px; font-weight: 700; }
+    .badge.ok { background: #dcfce7; color: #166534; }
+    .badge.warn { background: #fef3c7; color: #92400e; }
+    .badge.ng { background: #fee2e2; color: #991b1b; }
+    .reason { margin-top: 8px; font-size: 14px; font-weight: 600; }
+    .reason.ng { color: #991b1b; }
+    .reason.warn { color: #92400e; }
+    .name { margin-top: 14px; font-size: 22px; font-weight: 700; }
+    .kana { font-size: 13px; color: #64748b; }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin-top: 14px; font-size: 15px; }
+    dt { color: #64748b; font-size: 13px; padding-top: 2px; }
+    dd { font-weight: 600; }
+    dd.expired { color: #991b1b; }
+    .message { margin-top: 14px; padding: 10px 12px; background: #fef3c7; border-left: 4px solid #f59e0b; font-size: 14px; white-space: pre-wrap; }
+    .message strong { display: block; font-size: 12px; color: #92400e; margin-bottom: 2px; }
   </style>
 </head>
 <body>
+<header>
+  <h1>WONDER WALL 受付</h1>
+  <div class="who hidden" id="who">
+    <div id="staffName"></div>
+    <button type="button" id="logoutButton">ログアウト</button>
+  </div>
+</header>
+
 <main>
-  <h1>カメラ動作確認（スタッフ用テスト）</h1>
-  <button id="start" type="button">カメラを起動</button>
-  <video id="video" playsinline muted></video>
-  <div id="status">「カメラを起動」を押してください。</div>
-  <div id="result"></div>
-  <h2>診断結果</h2>
-  <ul id="checks"></ul>
+  <!-- ログイン -->
+  <section id="loginView">
+    <h2>スタッフログイン</h2>
+    <form id="loginForm" autocomplete="off">
+      <label for="staffId">スタッフID</label>
+      <input id="staffId" name="staffId" autocapitalize="characters" spellcheck="false" required>
+      <label for="pin">PIN（6桁）</label>
+      <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+      <button class="primary" type="submit" id="loginButton">ログイン</button>
+    </form>
+    <div class="notice hidden" id="loginNotice"></div>
+  </section>
+
+  <!-- 受付 -->
+  <div id="desk" class="hidden">
+    <section>
+      <button class="primary" type="button" id="scanButton" style="margin-top:0">QRコードを読み取る</button>
+      <video id="video" class="hidden" playsinline muted></video>
+      <button class="secondary hidden" type="button" id="stopButton" style="width:100%;margin-top:8px">読み取りをやめる</button>
+      <form id="searchForm" autocomplete="off">
+        <label for="memberNo">会員番号で検索（紙の会員証など）</label>
+        <div class="row">
+          <input id="memberNo" name="memberNo" placeholder="WW-0001 または 1" autocapitalize="characters" spellcheck="false">
+          <button class="secondary" type="submit" id="searchButton">検索</button>
+        </div>
+      </form>
+      <div class="notice hidden" id="deskNotice"></div>
+    </section>
+
+    <section id="result" class="hidden">
+      <span class="badge" id="badge"></span>
+      <div class="reason hidden" id="reason"></div>
+      <div class="name" id="memberName"></div>
+      <div class="kana" id="memberKana"></div>
+      <dl>
+        <dt>会員番号</dt><dd id="memberNoValue"></dd>
+        <dt>会員種別</dt><dd id="memberType"></dd>
+        <dt>会員状態</dt><dd id="memberStatus"></dd>
+        <dt>会員有効期限</dt><dd id="memberExpiry"></dd>
+        <dt>月額有効期限</dt><dd id="monthlyExpiry"></dd>
+      </dl>
+      <div class="message hidden" id="memberMessage"><strong>伝言（スタッフ用）</strong><span id="memberMessageText"></span></div>
+      <button class="primary" type="button" id="nextButton">次の会員を読み取る</button>
+    </section>
+  </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"
+        integrity="sha256-vEDIoVGWI2sjFNsIVvcsoLSZgM1UE7jIUqc0n1/uCFk="
+        crossorigin="anonymous"></script>
 <script>
 (function () {
-  var video = document.getElementById('video');
-  var startButton = document.getElementById('start');
-  var statusBox = document.getElementById('status');
-  var resultBox = document.getElementById('result');
-  var checks = document.getElementById('checks');
-  var canvas = document.createElement('canvas');
-  var context = canvas.getContext('2d', { willReadFrequently: true });
+  'use strict';
+
+  // GASの公開URL（会員証と同じデプロイ）。PINや会員情報はこのページに置かない。
+  var API_URL = 'https://script.google.com/macros/s/AKfycbxp2Tc49nuBgwIU0W8OKDTqboYztMwFgqy1TZFbYVcaejbTPu_P86ELRGZPv0_ysADY/exec';
+  var SESSION_KEY = 'ww-staff-session';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var session = null;
   var stream = null;
   var scanning = false;
+  var busy = false;
+  var canvas = document.createElement('canvas');
+  var context = canvas.getContext('2d', { willReadFrequently: true });
 
-  function addCheck(label, value) {
-    var item = document.createElement('li');
-    var name = document.createElement('span');
-    var answer = document.createElement('span');
-    name.textContent = label;
-    answer.textContent = value;
-    item.appendChild(name);
-    item.appendChild(answer);
-    checks.appendChild(item);
+  // ---------------------------------------------------------------- 共通
+
+  function show(element, visible) { element.classList.toggle('hidden', !visible); }
+
+  function notify(box, message, kind) {
+    box.textContent = message || '';
+    box.className = 'notice ' + (kind || 'error');
+    show(box, Boolean(message));
   }
 
-  function setStatus(message, className) {
-    statusBox.textContent = message;
-    statusBox.className = className || '';
+  function callApi(payload) {
+    return fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+      redirect: 'follow',
+      cache: 'no-store',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer'
+    }).then(function (response) {
+      if (!response.ok) { throw new Error('HTTP ' + response.status); }
+      return response.json();
+    }).catch(function () {
+      return { ok: false, error: 'network', message: '通信できませんでした。電波の状態を確認して、もう一度お試しください。' };
+    });
   }
+
+  // ログイン情報はタブを閉じると消える sessionStorage に置く
+  function saveSession(value) {
+    session = value;
+    try {
+      if (value) { sessionStorage.setItem(SESSION_KEY, JSON.stringify(value)); }
+      else { sessionStorage.removeItem(SESSION_KEY); }
+    } catch (error) { /* 保存できなくても、このタブを開いている間は使える */ }
+  }
+
+  function loadSession() {
+    try {
+      var saved = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+      if (saved && saved.token && saved.expiresAt > Date.now()) { return saved; }
+    } catch (error) { /* 読めなければログインからやり直す */ }
+    return null;
+  }
+
+  function render() {
+    var loggedIn = Boolean(session);
+    show($('loginView'), !loggedIn);
+    show($('desk'), loggedIn);
+    show($('who'), loggedIn);
+    $('staffName').textContent = loggedIn ? session.staff.name + '（' + session.staff.staffId + '）' : '';
+    if (!loggedIn) { stopCamera(); }
+  }
+
+  function backToLogin(message) {
+    saveSession(null);
+    render();
+    notify($('loginNotice'), message, 'error');
+  }
+
+  // ---------------------------------------------------------------- ログイン
+
+  $('loginForm').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var staffId = $('staffId').value.trim();
+    var pin = $('pin').value.trim();
+    if (!/^[0-9]{6}$/.test(pin)) {
+      notify($('loginNotice'), 'PINは6桁の数字で入力してください。');
+      return;
+    }
+    $('loginButton').disabled = true;
+    notify($('loginNotice'), 'ログインしています…', 'info');
+    callApi({ action: 'login', staffId: staffId, pin: pin }).then(function (result) {
+      $('loginButton').disabled = false;
+      $('pin').value = '';
+      if (!result.ok) {
+        notify($('loginNotice'), result.message);
+        return;
+      }
+      saveSession({
+        token: result.token,
+        staff: result.staff,
+        expiresAt: Date.now() + (result.expiresInSeconds - 60) * 1000
+      });
+      notify($('loginNotice'), '');
+      notify($('deskNotice'), '');
+      render();
+    });
+  });
+
+  $('logoutButton').addEventListener('click', function () {
+    var token = session && session.token;
+    saveSession(null);
+    render();
+    show($('result'), false);
+    if (token) { callApi({ action: 'logout', token: token }); }
+  });
+
+  // ---------------------------------------------------------------- 会員照会
+
+  function lookup(query) {
+    if (busy) { return; }
+    if (!session || session.expiresAt <= Date.now()) {
+      backToLogin('ログインの有効期限が切れました。もう一度ログインしてください。');
+      return;
+    }
+    busy = true;
+    $('searchButton').disabled = true;
+    show($('result'), false);
+    notify($('deskNotice'), '会員を確認しています…', 'info');
+    query.action = 'lookupMember';
+    query.token = session.token;
+    callApi(query).then(function (result) {
+      busy = false;
+      $('searchButton').disabled = false;
+      if (result.error === 'unauthorized') {
+        backToLogin(result.message);
+        return;
+      }
+      if (!result.ok) {
+        notify($('deskNotice'), result.message);
+        return;
+      }
+      notify($('deskNotice'), '');
+      showMember(result.member);
+    });
+  }
+
+  var STATES = {
+    ok: { label: '利用できます', kind: 'ok', reason: '' },
+    expired: { label: '期限切れ', kind: 'ng', reason: '会員の有効期限が切れています。更新の手続きを案内してください。' },
+    needsCheck: { label: '要確認', kind: 'warn', reason: '有効期限を読み取れません。完全会員マスターの日付を確認してください。' },
+    unavailable: { label: '利用不可', kind: 'ng', reason: '会員状態が「有効」ではありません。' }
+  };
+
+  function showMember(member) {
+    var state = STATES[member.state] || STATES.unavailable;
+    $('badge').textContent = state.label;
+    $('badge').className = 'badge ' + state.kind;
+    var reason = state.reason;
+    if (member.state === 'unavailable') { reason = '会員状態が「' + member.status + '」のため利用できません。'; }
+    if (member.state === 'ok' && member.monthlyExpired) {
+      reason = '月額会員の有効期限が切れています。';
+      $('reason').className = 'reason warn';
+    } else {
+      $('reason').className = 'reason ' + state.kind;
+    }
+    $('reason').textContent = reason;
+    show($('reason'), Boolean(reason));
+
+    $('memberName').textContent = member.name + ' 様';
+    $('memberKana').textContent = member.kana;
+    $('memberNoValue').textContent = member.memberNo;
+    $('memberType').textContent = member.type || '—';
+    $('memberStatus').textContent = member.status;
+    $('memberExpiry').textContent = member.memberExpiryText;
+    $('memberExpiry').className = member.state === 'expired' ? 'expired' : '';
+    $('monthlyExpiry').textContent = member.monthlyExpiryText + (member.monthlyExpired ? '（期限切れ）' : '');
+    $('monthlyExpiry').className = member.monthlyExpired ? 'expired' : '';
+    $('memberMessageText').textContent = member.message;
+    show($('memberMessage'), Boolean(member.message));
+    show($('result'), true);
+    $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  $('searchForm').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var memberNo = $('memberNo').value.trim();
+    if (!memberNo) {
+      notify($('deskNotice'), '会員番号を入力してください。');
+      return;
+    }
+    stopCamera();
+    lookup({ memberNo: memberNo });
+  });
+
+  // ---------------------------------------------------------------- カメラ
 
   function stopCamera() {
     scanning = false;
@@ -69,29 +304,14 @@
       stream.getTracks().forEach(function (track) { track.stop(); });
       stream = null;
     }
-    video.style.display = 'none';
-    startButton.disabled = false;
-  }
-
-  function explainCameraError(error) {
-    if (error.name === 'NotAllowedError') {
-      return 'カメラが許可されていません（ブラウザの許可、またはGASの画面の制限）。';
-    }
-    if (error.name === 'NotFoundError') { return 'カメラが見つかりません。'; }
-    if (error.name === 'NotReadableError') { return 'カメラを他のアプリが使用中です。'; }
-    return 'カメラを起動できませんでした。';
-  }
-
-  function runDiagnostics() {
-    var policy = document.permissionsPolicy || document.featurePolicy;
-    addCheck('HTTPS接続', window.isSecureContext ? 'OK' : 'NG');
-    addCheck('カメラAPI', navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 'OK' : 'NG');
-    addCheck('画面内カメラ許可', policy && policy.allowsFeature ? (policy.allowsFeature('camera') ? 'OK' : 'NG') : '判定不可');
-    addCheck('QR解析ライブラリ', typeof window.jsQR === 'function' ? 'OK' : 'NG');
+    show($('video'), false);
+    show($('stopButton'), false);
+    $('scanButton').disabled = false;
   }
 
   function scanFrame() {
     if (!scanning) { return; }
+    var video = $('video');
     if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
       var scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
       canvas.width = Math.round(video.videoWidth * scale);
@@ -99,51 +319,63 @@
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       var image = context.getImageData(0, 0, canvas.width, canvas.height);
       var code = window.jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
-      if (code) {
-        setStatus('読み取り成功', 'ok');
-        resultBox.textContent = '読み取った内容: ' + code.data;
+      if (code && code.data) {
         stopCamera();
+        lookup({ authId: code.data.trim() });
         return;
       }
     }
     window.setTimeout(scanFrame, 200);
   }
 
-  startButton.addEventListener('click', function () {
-    startButton.disabled = true;
-    resultBox.textContent = '';
-    setStatus('カメラを起動しています…');
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setStatus('この画面ではカメラAPIを使えません。', 'ng');
-      startButton.disabled = false;
+  function startCamera() {
+    if (typeof window.jsQR !== 'function') {
+      notify($('deskNotice'), 'QR読み取りの準備ができていません。ページを再読み込みしてください。');
       return;
     }
-
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      notify($('deskNotice'), 'このブラウザではカメラを使えません。会員番号で検索してください。');
+      return;
+    }
+    $('scanButton').disabled = true;
+    show($('result'), false);
+    notify($('deskNotice'), 'カメラを起動しています…', 'info');
     navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
       .then(function (cameraStream) {
         stream = cameraStream;
+        var video = $('video');
         video.srcObject = stream;
-        video.style.display = 'block';
+        show(video, true);
+        show($('stopButton'), true);
         return video.play();
       })
       .then(function () {
-        if (typeof window.jsQR !== 'function') {
-          setStatus('カメラは動きましたが、QR解析ライブラリを読み込めませんでした。', 'ng');
-          return;
-        }
-        setStatus('カメラ起動OK。会員証のQRを映してください。', 'ok');
+        notify($('deskNotice'), '会員証のQRコードを映してください。', 'info');
         scanning = true;
         scanFrame();
       })
       .catch(function (error) {
-        setStatus(explainCameraError(error) + '（' + error.name + '）', 'ng');
         stopCamera();
+        var message = error && error.name === 'NotAllowedError'
+          ? 'カメラが許可されていません。ブラウザの設定でカメラを許可してください。'
+          : 'カメラを起動できませんでした。会員番号で検索してください。';
+        notify($('deskNotice'), message);
       });
-  });
+  }
 
+  $('scanButton').addEventListener('click', startCamera);
+  $('nextButton').addEventListener('click', function () {
+    $('memberNo').value = '';
+    startCamera();
+  });
+  $('stopButton').addEventListener('click', function () {
+    stopCamera();
+    notify($('deskNotice'), '');
+  });
   window.addEventListener('pagehide', stopCamera);
-  runDiagnostics();
+
+  session = loadSession();
+  render();
 })();
 </script>
 </body>
